@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 
 namespace MainMenu {
 	[RequireComponent(typeof(EventTrigger))]
-	public class CustomButton : MonoBehaviour {
+	public abstract class CustomButton : MonoBehaviour {
 		int index;
 		Text text;
 		RectTransform rectTransform;
@@ -35,5 +35,9 @@ namespace MainMenu {
 		public void Exit(){
 
 		}
+
+		public abstract void Activate ();
+
+		public abstract void Deactivate ();
 	}
 }
