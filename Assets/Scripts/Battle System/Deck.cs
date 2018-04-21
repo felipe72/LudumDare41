@@ -19,6 +19,7 @@ namespace Battle {
 				cards[i] = Instantiate (card, Hand.Instance.disabledCards).GetComponent<Card>();
 			}
 
+			Shuffle ();
 			CheckEmpty ();
 		}
 
@@ -32,11 +33,16 @@ namespace Battle {
 
 		public Card DrawCard(){
 			if (cards.Count == 0) {
-				return null;
+				ShuffleToDeck (Hand.Instance.discardPile);
+				if (cards.Count == 0) {
+					print ("oi");
+					return null;
+				}
+
+				Shuffle ();
 			}
 
 			Card card = cards [0];
-
 			RemoveCard (card);
 
 			return card;
@@ -73,12 +79,30 @@ namespace Battle {
 		}
 
 		public void Shuffle(){
-
+			ShuffleList (cards);
 		}
 
 		public void ShuffleToDeck(Deck deck){
-			deck.AddCard (cards.ToArray());
-			RemoveCard (cards.ToArray());
+			AddCard (deck.cards.ToArray());
+
+			foreach (var card in deck.cards) {
+				card.transform.SetParent (Hand.Instance.disabledCards, false);
+			}
+
+			deck.RemoveCard (deck.cards.ToArray());
+		}
+
+		void ShuffleList(List<Card> list){
+			int n = list.Count;
+			var rng = new System.Random ();
+
+			while (n > 1) {
+				n--;
+				int k = rng.Next (n + 1);
+				var value = list [k];
+				list [k] = list [n];
+				list [n] = value;
+			}
 		}
 	}
 }

@@ -5,28 +5,47 @@ using Global;
 using UnityEngine.UI;
 using DG.Tweening;
 using UnityEngine.EventSystems;
+using System.Linq;
 
 namespace Battle {
-	public class Card : MonoBehaviour {
-		[Header("Game Objects Config")]
-		public Text costText;
-		public Text descriptionText;
-		public Text nameText;
-		public Image background;
-		public Image icon;
+	public enum CardType {Guitarrist, Bassist, Drummer, Vocalist}
 
+	public class Card : MonoBehaviour {
 		[Header("Card Config")]
 		public int cost;
-		public string _name;
-		public string description;
+		public bool friendly;
+		public bool individual;
+		public CardType type;
 
 		public event VoidCallback onCardDraw;
 		public event VoidCallback onCardDiscarted;
 
+		bool disabled;
 		Effect[] effects;
 		bool chosen;
 		RectTransform rectTransform;
 		float moveCardTime = .5f;
+		Vector3 savedPosition;
+
+		Friendly GetUnit(){
+			Friendly _friendly = null;
+			switch (type) {
+			case CardType.Bassist:
+				_friendly = FindObjectOfType<Bassist> ();
+				break;
+			case CardType.Guitarrist:
+				_friendly = FindObjectOfType<Guitarrist> ();
+				break;
+			case CardType.Vocalist:
+				_friendly = FindObjectOfType<Vocalist> ();
+				break;
+			case CardType.Drummer:
+				_friendly = FindObjectOfType<Drummer> ();
+				break;
+			}
+
+			return _friendly;
+		}
 
 		protected void Awake(){
 			Initialize ();
@@ -35,6 +54,12 @@ namespace Battle {
 		void Initialize(){
 			effects = GetComponents<Effect> ();
 			rectTransform = (RectTransform)transform;
+
+			onCardDiscarted += () => disabled = true;
+			onCardDraw += () => {
+				disabled = false;
+				chosen = false;
+			};
 
 			EventTrigger trigger = GetComponent<EventTrigger> ();
 
@@ -50,60 +75,122 @@ namespace Battle {
 				trigger.triggers.Add (entry);
 				trigger.triggers.Add (exit);
 			}
+		}
 
-			FormatCard ();
+		List<Unit> GetUnits(){
+			if (friendly) {
+				if (individual) {
+					List<Unit> _units = new List<Unit> ();
+					_units.Add (FindObjectsOfType<Friendly> ().OrderBy(x => x.index).ToList() [0]);
+					return _units;
+				} else {
+					return FindObjectsOfType<Friendly> ().Select(x => x.GetComponent<Unit>()).ToList();
+				}
+			} else {
+				if (individual) {
+					List<Unit> _units = new List<Unit> ();
+					_units.Add (FindObjectsOfType<Enemy> ().OrderBy(x => x.index).ToList() [0]);
+					return _units;
+				} else {
+					return FindObjectsOfType<Enemy> ().Select(x => x.GetComponent<Unit>()).ToList();;
+				}
+			}
 		}
 
 		void MoveUp(){
-			if (!chosen) {
+			if (!chosen && !disabled) {
 				rectTransform.DOLocalMoveY (rectTransform.sizeDelta.y / 4f, moveCardTime);
+				foreach (var unit in GetUnits()) {
+					unit.Higlight ();
+				}
 			}
 		}
 
 		void MoveDown(){
-			if (!chosen) {
+			if (!chosen && !disabled) {
 				rectTransform.DOLocalMoveY (0, moveCardTime);
+				foreach (var unit in GetUnits()) {
+					unit.Unhighlight();
+				}
 			}
 		}
 
-		public void Execute(Unit unit){
-			foreach (var effect in effects) {
-				effect.Execute (unit);
-			}
+		public IEnumerator Execute(){
+			Friendly _unit = GetUnit ();
 
+			yield return StartCoroutine (_unit.MoveForward());
+
+
+			foreach (var effect in effects) {
+				effect.Execute (this);
+			}
+			yield return new WaitForSeconds (1f);
+			yield return StartCoroutine (_unit.MoveBack());
+
+			Hand.Instance.Dispose (this);
 			Deselect ();
 		}
 
-		public void FormatCard(){
-			costText.text = cost.ToString ();
-
-			// It should be nice to get params on the text, and do some parsing or something on the text like "<attack>" and get the amount of attack
-			// Maybe it can be done with some sort of json
-			descriptionText.text = description;
-			nameText.text = _name;
-		}
-
 		public void Click(){
-			if (!chosen) {
-				Select ();
+			if (TurnManager.Instance.CurrentTurn () == Turn.SelectCards) {
+				if (!chosen) {
+					Select ();
+				} else {
+					Deselect ();
+				}
 			} else {
-				Deselect ();
+				foreach (var unit in GetUnits()) {
+					unit.Unhighlight();
+				}
+				if (!chosen) {
+					SelectDiscard ();
+				} else {
+					DeselectDiscard ();
+				}
 			}
 		}
 
+		public void SelectDiscard (){
+			chosen = true;
+			rectTransform.DOKill ();
+			Hand.Instance.SelectDiscard (this);
+		}
+
+		public void DeselectDiscard (){
+			chosen = false;
+			Hand.Instance.DeselectDiscard (this);
+		}
+
 		public void Select(){
-			if (TurnClock.Instance.CanStack(this)) {
+			foreach (var unit in GetUnits()) {
+				unit.Unhighlight();
+			}
+
+			if (TurnClock.Instance.CanStack (this)) {
 				chosen = true;
 				rectTransform.DOLocalMoveY (rectTransform.sizeDelta.y / 2f, moveCardTime);
 				Hand.Instance.SelectCard (this);
+			} else {
+				print ("oi");
 			}
 		}
 
 		public void Deselect(){
+			foreach (var unit in GetUnits()) {
+				unit.Higlight();
+			}
 			chosen = false;
 
 			rectTransform.DOLocalMoveY (0, moveCardTime);
 			Hand.Instance.DeselectCard (this);
+		}
+
+		public void SavePosition(){
+			savedPosition = rectTransform.position;
+		}
+
+		public void ReturnToSaved(){
+			rectTransform.position = savedPosition;
 		}
 
 		public void OnCardDraw(){

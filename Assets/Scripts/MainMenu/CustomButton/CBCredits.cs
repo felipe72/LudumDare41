@@ -15,7 +15,7 @@ namespace MainMenu {
 		}
 
 		public override void Deactivate (){
-
+			window.DOLocalMoveY (-2000, moveTime).SetEase(Ease.OutBack);
 		}
 	}
 }

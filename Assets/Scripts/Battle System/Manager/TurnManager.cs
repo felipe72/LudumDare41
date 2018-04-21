@@ -4,23 +4,46 @@ using UnityEngine;
 using Global;
 
 namespace Battle {
-public class TurnManager : Singleton<TurnManager> {
+	public enum Turn { Drawing, Status, SelectCards, DiscardCards, ResolveTurn}
+
+	public class TurnManager : Singleton<TurnManager> {
 		bool nextTurn;
+		Turn currentTurn;
 
 		void Start(){
-			StartCoroutine (Turn ());
+			StartCoroutine (TurnByTurn ());
 		}
 
-		IEnumerator Turn(){
-			yield return StartCoroutine (Draw ());
+		public void ReadyNextTurn(){
+			nextTurn = true;
+		}
 
-			yield return StartCoroutine (ResolveStatus ());
+		IEnumerator TurnByTurn(){
+			while (true) {
+				yield return StartCoroutine (SpawnEnemies());
 
-			yield return StartCoroutine (SelectingCards ());
+				currentTurn = Turn.Drawing;
+				yield return StartCoroutine (Draw ());
 
-			yield return StartCoroutine (Discard ());
+				currentTurn = Turn.Status;
+				yield return StartCoroutine (ResolveStatus ());
 
-			yield return StartCoroutine (ResolveTurn ());
+				currentTurn = Turn.SelectCards;
+				yield return StartCoroutine (SelectingCards ());
+
+				currentTurn = Turn.DiscardCards;
+				yield return StartCoroutine (Discard ());
+
+				currentTurn = Turn.ResolveTurn;
+				yield return StartCoroutine (ResolveTurn ());
+			}
+		}
+
+		IEnumerator SpawnEnemies(){
+			EnemyWave.Instance.CheckEndWave ();
+			yield return new WaitUntil(() => nextTurn);
+			EnemyWave.Instance.SetIniciative ();
+			nextTurn = false;
 		}
 
 		IEnumerator Draw(){
@@ -33,14 +56,25 @@ public class TurnManager : Singleton<TurnManager> {
 
 		IEnumerator SelectingCards(){
 			yield return new WaitUntil(() => nextTurn);
+			nextTurn = false;
 		}
 
 		IEnumerator Discard(){
-			yield return null;
+			Hand.Instance.StartDiscardPhase ();
+			yield return new WaitUntil(() => nextTurn);
+			Hand.Instance.DiscardSelected ();
+			nextTurn = false;
 		}
 
 		IEnumerator ResolveTurn(){
-			yield return null;
+			Hand.Instance.ExecuteSelected ();
+			yield return new WaitUntil(() => nextTurn);
+			TurnClock.Instance.CleanIcons();
+			nextTurn = false;
+		}
+
+		public Turn CurrentTurn(){
+			return currentTurn;
 		}
 	}
 }

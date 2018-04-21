@@ -28,9 +28,8 @@ public class CurvedText : Text
 	private float _scaleFactor = -1;
 	private float _circumference = -1;
 
-	protected override void OnValidate()
+	protected void OnValidate()
 	{
-		base.OnValidate();
 		if(radius <= 0.0f)
 		{
 			radius = 0.001f;

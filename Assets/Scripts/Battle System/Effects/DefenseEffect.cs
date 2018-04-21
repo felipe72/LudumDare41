@@ -6,12 +6,12 @@ namespace Battle {
 	public class DefenseEffect : Effect {
 		public int amount;
 
-		public override void Execute (Unit unit){
-			base.Execute (unit);
+		public override void Execute (Card card){
+			base.Execute (card);
 
-			unit.AddShield (amount);
-
-			print ("Defend yourself, bitch");
+			foreach (var unit in units) {
+				unit.AddShield (amount);
+			}
 		}
 	}
 }
